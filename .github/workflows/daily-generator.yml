@@ -1,33 +1,52 @@
-name: Daily File Generator
+name: Generate MD File Daily
 
 on:
   schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
+    - cron: '0 8 * * *'  # 每天早上 8 点触发任务
 
 jobs:
-  generate-file:
+  generate-md-file:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # 显式声明写入权限
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: main  # 确保与默认分支名称一致
-          token: ${{ secrets.PAT || github.token }}
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Generate File
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
         run: |
-          DATE=$(date +"%Y-%m-%d")
-          mkdir -p generated_files
-          echo "# Report $DATE" > "generated_files/report-$DATE.md"
+          python -m pip install --upgrade pip
+          pip install jinja2
 
-      - name: Commit
-        uses: EndBug/add-and-commit@v9
-        with:
-          add: 'generated_files/*'
-          commit_message: "Add report ${{ steps.get-date.outputs.date }}"
-          token: ${{ secrets.PAT || github.token }}
-          branch: main  # 显式指定分支
+      - name: Generate MD file from template
+        run: |
+          echo "Generating Markdown file..."
+          python -c '
+            import jinja2
+            import datetime
+
+            # 加载模板文件
+            env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
+            template = env.get_template("template.md")
+
+            # 渲染模板内容
+            today = datetime.datetime.now()
+            content = template.render(date=today.strftime("%Y-%m-%d"))
+
+            # 写入生成的文件
+            output_file = f"daily-notes/Summary_{today.strftime('%Y%m%d')}.md"
+            with open(output_file, "w") as f:
+                f.write(content)
+          '
+
+      - name: Commit and push generated file
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add output/
+          git commit -m "Generated Markdown file on $(date +'%Y-%m-%d')"
+          git push origin HEAD
