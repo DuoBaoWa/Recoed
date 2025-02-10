@@ -1,53 +1,47 @@
-name: Generate MD File Daily
+name: Daily File Generator
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # 每天早上 8 点触发任务
+    - cron: '0 0 * * *'  # UTC时间每天0点（北京时间8点）
   workflow_dispatch:
 
 jobs:
-  generate-md-file:
+  generate-file:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 必须的写入权限
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          python-version: '3.9'
+          ref: main
+          token: ${{ secrets.PAT || github.token }}
+          fetch-depth: 0  # 获取完整提交历史
 
-      - name: Install dependencies
+      - name: Generate File from Template
+        id: generate
         run: |
-          python -m pip install --upgrade pip
-          pip install jinja2
+          # 设置时间变量
+          DATE=$(date +"%Y-%m-%d")
+          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S %Z")
+          
+          # 创建目标目录
+          mkdir -p generated_files
+          
+          # 使用模板生成文件
+          sed -e "s/{{DATE}}/$DATE/g" \
+              -e "s/{{TIMESTAMP}}/$TIMESTAMP/g" \
+              templates/template.md > "daily-notes/Summary-$DATE.md"
+          
+          # 输出变量供后续步骤使用
+          echo "date=$DATE" >> $GITHUB_OUTPUT
 
-      - name: Generate MD file from template
-        run: |
-          echo "Generating Markdown file..."
-          python -c '
-            import jinja2
-            import datetime
-
-            # 加载模板文件
-            env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
-            template = env.get_template("templates/template.md")
-
-            # 渲染模板内容
-            today = datetime.datetime.now()
-            content = template.render(date=today.strftime("%Y-%m-%d"))
-
-            # 写入生成的文件
-            output_file = f"daily-notes/Summary_{today.strftime('%Y%m%d')}.md"
-            with open(output_file, "w") as f:
-                f.write(content)
-          '
-
-      - name: Commit and push generated file
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add output/
-          git commit -m "Generated Markdown file on $(date +'%Y-%m-%d')"
-          git push origin HEAD
+      - name: Commit Changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: 'generated_files/*'
+          commit_message: "Auto-generated report for ${{ steps.generate.outputs.date }}"
+          token: ${{ secrets.PAT || github.token }}
+          branch: main
+          committer_name: "Docs Bot"
