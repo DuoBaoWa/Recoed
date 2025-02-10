@@ -3,6 +3,7 @@ name: Generate MD File Daily
 on:
   schedule:
     - cron: '0 8 * * *'  # 每天早上 8 点触发任务
+  workflow_dispatch:
 
 jobs:
   generate-md-file:
