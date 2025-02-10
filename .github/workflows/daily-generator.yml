@@ -2,32 +2,32 @@ name: Daily File Generator
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 时间 00:00 运行（北京时间 08:00）
-  workflow_dispatch:     # 允许手动触发
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   generate-file:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 显式声明写入权限
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main  # 确保与默认分支名称一致
+          token: ${{ secrets.PAT || github.token }}
 
-      - name: Generate new file
+      - name: Generate File
         run: |
-          # 设置时间变量
           DATE=$(date +"%Y-%m-%d")
-          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S %Z")
-          
-          # 创建目标目录
           mkdir -p generated_files
-          
-          # 处理模板
-          sed "s/{{DATE}}/$DATE/g; s/{{TIMESTAMP}}/$TIMESTAMP/g" templates/template.md > "generated_files/report-$DATE.md"
+          echo "# Report $DATE" > "generated_files/report-$DATE.md"
 
-      - name: Commit changes
+      - name: Commit
         uses: EndBug/add-and-commit@v9
         with:
           add: 'generated_files/*'
-          commit_message: "Auto-generated report for ${{ steps.vars.outputs.date }}"
-          committer_name: GitHub Actions
-          committer_email: actions@github.com
+          commit_message: "Add report ${{ steps.get-date.outputs.date }}"
+          token: ${{ secrets.PAT || github.token }}
+          branch: main  # 显式指定分支
