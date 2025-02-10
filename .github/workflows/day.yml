@@ -32,7 +32,7 @@ jobs:
 
             # 加载模板文件
             env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
-            template = env.get_template("template.md")
+            template = env.get_template("templates/template.md")
 
             # 渲染模板内容
             today = datetime.datetime.now()
